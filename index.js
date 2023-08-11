@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import AuthRoutes from "./routes/AuthRoutes.js";
 import MessageRoutes from "./routes/MessageRoutes.js";
+import { Server } from "socket.io";
 
 dotenv.config();
 
@@ -18,4 +19,28 @@ const server = app.listen(process.env.PORT, () => {
   console.log(`Server is listening at PORT: ${process.env.PORT}...`);
 });
 
+// For Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+  },
+});
+
+// To ensure each entry is made once[non repeating]
 global.onlineUsers = new Map();
+
+io.on("connection", (socket) => {
+  global.chatSocket = socket;
+  socket.on("add-user", (userId) => {
+    onlineUsers.set(userId, socket.id);
+  });
+  socket.on("send-msg", (data) => {
+    const sendUserSocket = onlineUsers.get(data.to);
+    if (sendUserSocket) {
+      socket.to(sendUserSocket).emit("msg-recieve", {
+        from: data.from,
+        message: data.message,
+      });
+    }
+  });
+});
